@@ -1,0 +1,24 @@
+{
+  "name": "Minigolf Score Tracker",
+  "short_name": "Minigolf",
+  "description": "Score Tracker für 18 Bahnen Minigolf mit Power BI Dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#06091a",
+  "theme_color": "#00f2fe",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

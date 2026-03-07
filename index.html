@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minigolf Score</title>
+    <meta name="description" content="Minigolf Score Tracker für 18 Bahnen mit Power BI Dashboard">
+    <meta name="theme-color" content="#00f2fe">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Minigolf">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        :root {
+            --primary: #00f2fe;
+            --primary2: #4facfe;
+            --success: #00e676;
+            --warning: #ffea00;
+            --danger: #ff5252;
+            --bg: #06091a;
+            --glass: rgba(255,255,255,0.07);
+            --glass-strong: rgba(255,255,255,0.11);
+            --glass-border: rgba(255,255,255,0.13);
+            --glass-border-bright: rgba(255,255,255,0.22);
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+            background: var(--bg); color: white;
+            min-height: 100vh; min-height: 100dvh;
+            padding: 16px; padding-bottom: 48px;
+            touch-action: manipulation;
+            -webkit-text-size-adjust: 100%;
+            overflow-x: hidden;
+        }
+
+        /* === ANIMATED BACKGROUND === */
+        body::before {
+            content: ''; position: fixed; inset: 0; z-index: -2;
+            background:
+                radial-gradient(ellipse 80% 60% at 10% 0%, rgba(0,242,254,0.12) 0%, transparent 55%),
+                radial-gradient(ellipse 60% 50% at 90% 100%, rgba(79,172,254,0.1) 0%, transparent 55%),
+                radial-gradient(ellipse 50% 40% at 50% 50%, rgba(0,230,118,0.04) 0%, transparent 60%);
+        }
+        body::after {
+            content: ''; position: fixed; inset: 0; z-index: -1;
+            background: 
+                radial-gradient(circle 300px at 15% 25%, rgba(0,242,254,0.05) 0%, transparent 70%),
+                radial-gradient(circle 200px at 85% 75%, rgba(79,172,254,0.06) 0%, transparent 70%);
+            animation: bgPulse 8s ease-in-out infinite alternate;
+        }
+        @keyframes bgPulse {
+            from { opacity: 0.6; }
+            to { opacity: 1; }
+        }
+
+        /* === GLASS CARD === */
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 18px; margin-bottom: 14px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
+        }
+
+        .setup-screen, .game-screen { display:none; }
+        .active { display:block !important; }
+
+        /* === INPUTS === */
+        input[type="text"] {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.13);
+            padding: 14px 16px; border-radius: 12px;
+            color: white; width: 100%;
+            margin-bottom: 10px; font-size: 16px;
+            outline: none; transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+            font-family: inherit;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        input[type="text"]:focus {
+            border-color: var(--primary);
+            background: rgba(0,242,254,0.06);
+            box-shadow: 0 0 0 3px rgba(0,242,254,0.1);
+        }
+        input::placeholder { color: rgba(255,255,255,0.3); }
+
+        /* === BUTTONS === */
+        button {
+            border: none; border-radius: 14px; font-weight: 700;
+            cursor: pointer; position: relative;
+            display: inline-flex; align-items: center; justify-content: center;
+            -webkit-appearance: none; appearance: none;
+            touch-action: manipulation;
+            user-select: none; -webkit-user-select: none;
+            transition: transform 0.12s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s, opacity 0.15s;
+            font-family: inherit; letter-spacing: 0.3px;
+        }
+        button:active { transform: scale(0.93) !important; opacity: 0.85; }
+
+        .btn-main {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary2) 100%);
+            color: #000; width: 100%; padding: 17px; font-size: 1.05rem;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 24px rgba(0,242,254,0.3), 0 1px 0 rgba(255,255,255,0.2) inset;
+            border-radius: 16px;
+        }
+        .btn-main:active { box-shadow: 0 2px 12px rgba(0,242,254,0.2); }
+
+        .btn-plus-minus {
+            width: 58px; height: 58px; font-size: 1.7rem;
+            border-radius: 16px; flex-shrink: 0;
+        }
+        .btn-minus {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.07);
+        }
+        .btn-plus {
+            background: linear-gradient(135deg, var(--primary), var(--primary2));
+            color: #000;
+            box-shadow: 0 4px 16px rgba(0,242,254,0.35), inset 0 1px 0 rgba(255,255,255,0.3);
+        }
+
+        .btn-nav {
+            width: 48px; height: 48px; font-size: 1rem;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: white; border-radius: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: white; width: 100%; padding: 14px; font-size: 0.95rem;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .btn-danger {
+            background: rgba(255,82,82,0.12);
+            border: 1px solid rgba(255,82,82,0.25);
+            color: var(--danger); width: 100%; padding: 14px; font-size: 0.9rem;
+            box-shadow: 0 2px 12px rgba(255,82,82,0.1);
+        }
+
+        /* === SCORE ROW === */
+        .score-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 16px; margin-bottom: 10px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .score-row.active-row {
+            border-color: rgba(0,242,254,0.2);
+            background: rgba(0,242,254,0.04);
+        }
+        .score-row .name { font-size: 1rem; font-weight: 600; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .score-controls { display: flex; align-items: center; gap: 14px; }
+        .score-value { font-size: 1.6rem; font-weight: 800; min-width: 40px; text-align: center; font-variant-numeric: tabular-nums; transition: color 0.2s; }
+
+        /* === BARS === */
+        .bar-container { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+        .player-bar-row { display:grid; grid-template-columns:68px 1fr 28px; align-items:center; gap:8px; }
+        .player-bar-row .name { font-size:0.78rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:rgba(255,255,255,0.6); }
+        .bar-bg {
+            background: rgba(255,255,255,0.06); height: 10px;
+            border-radius: 6px; overflow: hidden; position: relative;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+        }
+        .bar-fill { height:100%; transition:width 0.3s ease; border-radius:6px; }
+        .par-marker { position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--warning); z-index:2; border-radius:2px; box-shadow: 0 0 4px rgba(255,234,0,0.6); }
+        .bar-score { text-align:right; font-size:0.85rem; font-weight:700; font-variant-numeric:tabular-nums; }
+
+        /* === BAHN DOTS === */
+        .bahn-dots { display:flex; gap:4px; justify-content:center; margin-top:12px; flex-wrap:wrap; max-width:290px; margin-left:auto; margin-right:auto; }
+        .bahn-dot {
+            width:13px; height:13px; border-radius:50%;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+            cursor: pointer;
+        }
+        .bahn-dot.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(0,242,254,0.6), 0 0 20px rgba(0,242,254,0.2);
+            transform: scale(1.25);
+        }
+        .bahn-dot.filled { background: rgba(0,230,118,0.45); border-color: rgba(0,230,118,0.6); }
+
+        /* === SCREENS === */
+        .fullscreen {
+            display:none; position:fixed; inset:0;
+            z-index: 900;
+            overflow-y:auto; padding:20px; padding-bottom:90px;
+        }
+        .fullscreen.active { display:block; }
+        .fullscreen-bg {
+            background: rgba(6,9,26,0.92);
+            backdrop-filter: blur(30px) saturate(200%);
+            -webkit-backdrop-filter: blur(30px) saturate(200%);
+        }
+        .fullscreen-header {
+            display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;
+        }
+        .fullscreen-title {
+            font-size:1.25rem; font-weight:800; letter-spacing:0.5px;
+            background: linear-gradient(135deg, #fff 30%, rgba(255,255,255,0.5));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        /* === POWER BI DASHBOARD === */
+        .pbi-wrapper {
+            padding: 0 0 16px 0;
+        }
+
+        /* KPI Cards row */
+        .pbi-kpi-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .pbi-kpi {
+            background: var(--glass);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            padding: 12px 10px;
+            text-align: center;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+        }
+        .pbi-kpi-val {
+            font-size: 1.5rem; font-weight: 900;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+            background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .pbi-kpi-label {
+            font-size: 0.62rem; font-weight: 700; letter-spacing: 1px;
+            color: rgba(255,255,255,0.35); margin-top: 4px; text-transform: uppercase;
+        }
+        .pbi-kpi-sub {
+            font-size: 0.7rem; font-weight: 600; margin-top: 2px;
+        }
+
+        /* Chart section */
+        .pbi-chart-card {
+            background: var(--glass);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 14px 12px 10px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+        .pbi-chart-title {
+            font-size: 0.68rem; font-weight: 800; letter-spacing: 1.5px;
+            color: rgba(255,255,255,0.35); text-transform: uppercase;
+            margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .pbi-chart-legend {
+            display: flex; gap: 10px; flex-wrap: wrap;
+        }
+        .pbi-legend-item {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.65rem; color: rgba(255,255,255,0.5); font-weight: 600;
+        }
+        .pbi-legend-dot {
+            width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;
+        }
+
+        /* Grouped bar chart */
+        .pbi-chart-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 4px;
+        }
+        .pbi-chart-scroll::-webkit-scrollbar { height: 3px; }
+        .pbi-chart-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 2px; }
+        .pbi-chart-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+        .pbi-grouped-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+            min-height: 130px;
+            padding: 0 2px;
+            position: relative;
+        }
+        /* Y-axis grid lines */
+        .pbi-gridlines {
+            position: absolute;
+            inset: 0 0 22px 0;
+            display: flex; flex-direction: column; justify-content: space-between;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .pbi-gridline {
+            width: 100%; height: 1px;
+            background: rgba(255,255,255,0.06);
+        }
+        .pbi-gridline-par {
+            background: rgba(255,234,0,0.2);
+            box-shadow: 0 0 4px rgba(255,234,0,0.15);
+        }
+
+        /* Each hole group */
+        .pbi-hole-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            flex-shrink: 0;
+            cursor: pointer;
+            z-index: 1;
+        }
+        .pbi-hole-group:active { opacity: 0.7; }
+        .pbi-bars-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 108px;
+            position: relative;
+        }
+        .pbi-bar-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 100%;
+            position: relative;
+        }
+        .pbi-bar {
+            width: 100%;
+            border-radius: 3px 3px 0 0;
+            transition: height 0.5s cubic-bezier(0.34,1.56,0.64,1);
+            position: relative;
+            min-height: 2px;
+        }
+        .pbi-bar-val {
+            font-size: 0.6rem; font-weight: 800;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 2px;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+        .pbi-hole-label {
+            font-size: 0.6rem; font-weight: 700;
+            color: rgba(255,255,255,0.35);
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+        .pbi-hole-group.is-current .pbi-hole-label {
+            color: var(--primary);
+        }
+        .pbi-hole-group.is-done .pbi-hole-label {
+            color: rgba(0,230,118,0.7);
+        }
+        .pbi-par-dot {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px; height: 4px;
+            border-radius: 50%;
+            background: var(--warning);
+            box-shadow: 0 0 4px rgba(255,234,0,0.6);
+        }
+
+        /* Cumulative line chart */
+        .pbi-line-svg {
+            width: 100%;
+            overflow: visible;
+        }
+
+        /* Score table */
+        .pbi-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.72rem;
+        }
+        .pbi-table th {
+            font-size: 0.6rem; font-weight: 800; letter-spacing: 1px;
+            color: rgba(255,255,255,0.3); padding: 4px 6px;
+            text-align: center; text-transform: uppercase;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .pbi-table th:first-child { text-align: left; }
+        .pbi-table td {
+            padding: 6px 6px; text-align: center;
+            font-variant-numeric: tabular-nums; font-weight: 600;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .pbi-table td:first-child { text-align: left; font-weight: 700; }
+        .pbi-table tr:last-child td { border-bottom: none; }
+        .pbi-table .par-row td {
+            color: rgba(255,234,0,0.7); font-size: 0.65rem;
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .pbi-cell-under { color: var(--success) !important; }
+        .pbi-cell-par { color: var(--warning) !important; }
+        .pbi-cell-over { color: var(--danger) !important; }
+        .pbi-cell-empty { color: rgba(255,255,255,0.15) !important; }
+
+        /* === RESULTS === */
+        .result-card {
+            background: var(--glass);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px; overflow: hidden;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+        .result-row {
+            display:flex; justify-content:space-between; align-items:center;
+            padding:15px 18px; border-bottom:1px solid rgba(255,255,255,0.05);
+        }
+        .result-row:last-child { border-bottom:none; }
+        .result-row.first {
+            background: linear-gradient(135deg, rgba(0,242,254,0.1), rgba(79,172,254,0.08));
+            border-bottom-color: rgba(0,242,254,0.15);
+        }
+        .result-name { font-weight:600; display:flex; align-items:center; gap:8px; }
+        .result-score { font-weight:800; font-variant-numeric:tabular-nums; font-size:1.05rem; }
+        .trophy { font-size:1.2rem; }
+        .rank-badge {
+            width:24px; height:24px; border-radius:50%;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            display:inline-flex; align-items:center; justify-content:center;
+            font-size:0.7rem; font-weight:800; color:rgba(255,255,255,0.5);
+        }
+
+        /* === TOAST === */
+        .toast {
+            position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(100px);
+            background: linear-gradient(135deg, var(--success), #00c853);
+            color:#000; padding:12px 26px; border-radius:50px;
+            font-weight:800; font-size:0.9rem;
+            z-index:3000;
+            transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+            white-space:nowrap;
+            box-shadow: 0 6px 24px rgba(0,230,118,0.45), inset 0 1px 0 rgba(255,255,255,0.3);
+            pointer-events:none;
+        }
+        .toast.show { transform:translateX(-50%) translateY(0); }
+
+        /* === CUSTOM MODAL === */
+        .modal-backdrop {
+            display:none; position:fixed; inset:0;
+            background: rgba(6,9,26,0.75);
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            z-index:5000;
+            align-items:center; justify-content:center;
+        }
+        .modal-backdrop.active { display:flex; }
+        .modal-box {
+            background: rgba(15,22,48,0.95);
+            backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255,255,255,0.16);
+            border-radius: 24px;
+            padding: 28px 24px; width:88%; max-width:340px;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);
+            animation: modalPop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        @keyframes modalPop { from { opacity:0; transform:scale(0.85); } to { opacity:1; transform:scale(1); } }
+        .modal-icon { font-size:2.4rem; text-align:center; margin-bottom:10px; }
+        .modal-title { font-size:1.1rem; font-weight:800; text-align:center; margin-bottom:8px; }
+        .modal-text { font-size:0.88rem; color:rgba(255,255,255,0.55); text-align:center; line-height:1.5; margin-bottom:22px; }
+        .modal-btns { display:flex; gap:10px; }
+        .modal-btn-cancel {
+            flex:1; padding:14px;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.12);
+            color:white; border-radius:14px;
+            font-size:0.95rem; font-weight:700; cursor:pointer;
+            font-family:inherit;
+            touch-action:manipulation;
+        }
+        .modal-btn-confirm {
+            flex:1; padding:14px;
+            background: linear-gradient(135deg, var(--danger), #e53935);
+            color:white; border-radius:14px;
+            font-size:0.95rem; font-weight:700; cursor:pointer;
+            border:none; font-family:inherit;
+            box-shadow: 0 4px 16px rgba(255,82,82,0.35);
+            touch-action:manipulation;
+        }
+
+        /* === EXPORT MODAL === */
+        .export-option {
+            display:flex; align-items:center; gap:14px;
+            padding:16px 18px; border-radius:16px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            margin-bottom:10px; cursor:pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .export-option:active { background: rgba(255,255,255,0.09); transform:scale(0.98); }
+        .export-icon { font-size:1.6rem; flex-shrink:0; }
+        .export-label { font-weight:700; font-size:0.95rem; }
+        .export-sub { font-size:0.75rem; color:rgba(255,255,255,0.4); margin-top:2px; }
+
+        /* === STICKY BOTTOM === */
+        .sticky-bottom {
+            position:fixed; bottom:16px; left:16px; right:16px; z-index:910;
+        }
+
+        /* === ANIMATIONS === */
+        .fade-in { animation:fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+        /* === SETUP HERO === */
+        .setup-hero {
+            text-align:center; padding:32px 20px 28px;
+        }
+        .setup-logo {
+            font-size:3rem; margin-bottom:8px;
+            filter: drop-shadow(0 0 20px rgba(0,242,254,0.3));
+        }
+        .setup-title {
+            font-size:1.8rem; font-weight:900; letter-spacing:3px;
+            background: linear-gradient(135deg, #fff 0%, var(--primary) 60%, var(--primary2) 100%);
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+            margin-bottom:4px;
+        }
+        .setup-sub { color:rgba(255,255,255,0.35); font-size:0.85rem; margin-bottom:24px; letter-spacing:0.5px; }
+
+        /* === BAHN HEADER === */
+        .bahn-header-number {
+            font-size:0.7rem; font-weight:800; color:rgba(255,255,255,0.35);
+            letter-spacing:2px; margin-bottom:2px;
+        }
+        .bahn-header-name {
+            font-size:1.35rem; font-weight:800;
+            background: linear-gradient(135deg, #fff, rgba(255,255,255,0.7));
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+        }
+        .bahn-header-par { color:var(--warning); font-size:0.82rem; font-weight:600; margin-top:2px; }
+
+        /* === SECTION LABEL === */
+        .section-label {
+            font-size:0.7rem; font-weight:800; letter-spacing:2px;
+            color:rgba(255,255,255,0.3); margin-bottom:10px;
+            display:flex; align-items:center; gap:8px;
+        }
+        .section-label::after { content:''; flex:1; height:1px; background:rgba(255,255,255,0.07); }
+    </style>
+</head>
+<body>
+
+<!-- ===== SETUP ===== -->
+<div id="setup" class="setup-screen active">
+    <div class="glass-card">
+        <div class="setup-hero">
+            <div class="setup-logo">⛳</div>
+            <h1 class="setup-title">MINIGOLF</h1>
+            <p class="setup-sub">Score Tracker · 18 Bahnen</p>
+        </div>
+        <div id="playerInputs">
+            <input type="text" class="player-name" placeholder="Spieler 1 eingeben…">
+        </div>
+        <button class="btn-secondary" id="btnAddPlayer" onclick="addPlayerField()">＋ Spieler hinzufügen</button>
+        <button class="btn-main" id="btnStart" onclick="startGame()">SPIEL STARTEN</button>
+        <button id="resumeBtn" class="btn-main" onclick="resumeGame()" style="display:none; background:linear-gradient(135deg,#ffea00,#ffc400); color:#000; margin-top:10px;">▶ WEITERSPIELEN</button>
+    </div>
+</div>
+
+<!-- ===== GAME ===== -->
+<div id="game" class="game-screen">
+    <div class="glass-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <button class="btn-nav" id="btnPrev" onclick="changeBahn(-1)">‹</button>
+            <div style="text-align:center; flex:1;">
+                <div class="bahn-header-number" id="label-num">BAHN 1 VON 18</div>
+                <div class="bahn-header-name" id="label-bahn">Bahn 1</div>
+                <div class="bahn-header-par" id="label-par">Ziel: 2 Schläge</div>
+            </div>
+            <button class="btn-nav" id="btnNext" onclick="changeBahn(1)">›</button>
+        </div>
+        <div class="bahn-dots" id="bahnDots"></div>
+    </div>
+
+    <div class="glass-card fade-in">
+        <div class="section-label">SCORE EINGABE</div>
+        <div id="input-area"></div>
+    </div>
+
+    <div class="glass-card">
+        <div class="section-label">DIESE BAHN</div>
+        <div id="viz-area" class="bar-container"></div>
+    </div>
+
+    <button class="btn-main" id="btnResult" onclick="showBI()" style="background:linear-gradient(135deg,var(--success),#00c853); box-shadow:0 4px 24px rgba(0,230,118,0.3); margin-bottom:10px;">🏆 ERGEBNIS</button>
+    <button class="btn-secondary" id="btnOverview" onclick="showOverview()">📊 ALLE BAHNEN</button>
+    <button class="btn-secondary" id="btnExport" onclick="showModal('exportModal')" style="margin-bottom:10px;">⬆ EXPORTIEREN</button>
+    <button class="btn-danger" id="btnReset" onclick="showModal('deleteModal')">🗑 Spiel löschen</button>
+</div>
+
+<!-- ===== OVERVIEW ===== -->
+<div id="overview-screen" class="fullscreen fullscreen-bg">
+    <div class="fullscreen-header">
+        <span class="fullscreen-title">📊 Alle Bahnen</span>
+        <button class="btn-nav" id="btnCloseOverview" onclick="closeOverview()">✕</button>
+    </div>
+    <div id="overview-content"></div>
+    <div class="sticky-bottom">
+        <button class="btn-main" id="btnOverviewResult" onclick="closeOverview();showBI()" style="background:linear-gradient(135deg,var(--success),#00c853);">🏆 ERGEBNIS ANZEIGEN</button>
+    </div>
+</div>
+
+<!-- ===== RESULTS ===== -->
+<div id="bi-dashboard" class="fullscreen fullscreen-bg">
+    <div class="fullscreen-header">
+        <span class="fullscreen-title">⛳ Ergebnis</span>
+        <button class="btn-nav" id="btnCloseBI" onclick="closeBI()">✕</button>
+    </div>
+    <div id="final-stats"></div>
+    <div style="margin-top:20px;">
+        <button class="btn-secondary" id="btnExportFromBI" onclick="showModal('exportModal')" style="margin-bottom:10px;">⬆ EXPORTIEREN</button>
+        <button class="btn-secondary" id="btnBackFromBI" onclick="closeBI()">← ZURÜCK ZUM SPIEL</button>
+    </div>
+</div>
+
+<!-- ===== EXPORT MODAL ===== -->
+<div class="modal-backdrop" id="exportModal">
+    <div class="modal-box">
+        <div class="modal-icon">⬆</div>
+        <div class="modal-title">Spiel exportieren</div>
+        <div class="modal-text">Wähle, wie du das Ergebnis teilen möchtest</div>
+        <button class="export-option" id="exportCSV" onclick="hideModal('exportModal');doExportCSV()">
+            <span class="export-icon">📄</span>
+            <div><div class="export-label">CSV-Datei</div><div class="export-sub">Für Excel / Numbers</div></div>
+        </button>
+        <button class="export-option" id="exportText" onclick="hideModal('exportModal');doExportText()">
+            <span class="export-icon">💬</span>
+            <div><div class="export-label">Text kopieren</div><div class="export-sub">Für WhatsApp, Nachrichten…</div></div>
+        </button>
+        <button class="export-option" id="exportPDF" onclick="hideModal('exportModal');window.print()">
+            <span class="export-icon">🖨</span>
+            <div><div class="export-label">Drucken / PDF</div><div class="export-sub">Als PDF speichern</div></div>
+        </button>
+        <div style="margin-top:12px;">
+            <button class="modal-btn-cancel" id="btnCloseExport" onclick="hideModal('exportModal')" style="width:100%;">Abbrechen</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== DELETE CONFIRM MODAL ===== -->
+<div class="modal-backdrop" id="deleteModal">
+    <div class="modal-box">
+        <div class="modal-icon">🗑</div>
+        <div class="modal-title">Spiel löschen?</div>
+        <div class="modal-text">Alle Scores und Spielerdaten werden dauerhaft gelöscht. Das kann nicht rückgängig gemacht werden.</div>
+        <div class="modal-btns">
+            <button class="modal-btn-cancel" id="btnDeleteCancel" onclick="hideModal('deleteModal')">Abbrechen</button>
+            <button class="modal-btn-confirm" id="btnDeleteConfirm" onclick="doReset()">Löschen</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div class="toast" id="toast"></div>
+
+<script>
+    const pars = [2,2,3,3,2,3,3,3,3,2,2,2,3,2,3,3,3,3];
+    let players = [], currentBahn = 0, scores = {};
+
+    // ===== MODAL HELPERS =====
+    function showModal(id) { document.getElementById(id).classList.add('active'); }
+    function hideModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    // ===== SETUP =====
+    if (localStorage.getItem('mg_final_scores')) {
+        document.getElementById('resumeBtn').style.display = 'block';
+    }
+
+    let playerCount = 1;
+    function addPlayerField() {
+        playerCount++;
+        const i = document.createElement('input');
+        i.type = 'text'; i.className = 'player-name';
+        i.placeholder = 'Spieler ' + playerCount;
+        document.getElementById('playerInputs').appendChild(i);
+        i.focus();
+    }
+
+    function startGame() {
+        players = []; scores = {};
+        document.querySelectorAll('.player-name').forEach(function(i) {
+            const n = i.value.trim();
+            if (n) { players.push(n); scores[n] = new Array(18).fill(0); }
+        });
+        if (players.length > 0) { currentBahn = 0; init(); }
+        else { showToast('⚠ Mindestens 1 Spieler eingeben'); }
+    }
+
+    function resumeGame() {
+        try {
+            scores = JSON.parse(localStorage.getItem('mg_final_scores'));
+            players = JSON.parse(localStorage.getItem('mg_final_players'));
+            currentBahn = parseInt(localStorage.getItem('mg_final_bahn')) || 0;
+            init();
+        } catch(e) { localStorage.clear(); location.reload(); }
+    }
+
+    function init() {
+        document.getElementById('setup').classList.remove('active');
+        document.getElementById('game').classList.add('active');
+        buildBahnDots();
+        render();
+    }
+
+    // ===== DOTS =====
+    function buildBahnDots() {
+        const c = document.getElementById('bahnDots');
+        c.innerHTML = '';
+        for (let i = 0; i < 18; i++) {
+            const d = document.createElement('div');
+            d.className = 'bahn-dot'; d.dataset.bahn = i;
+            (function(idx) { d.onclick = function() { currentBahn = idx; render(); }; })(i);
+            c.appendChild(d);
+        }
+    }
+
+    function updateDots() {
+        document.querySelectorAll('.bahn-dot').forEach(function(d, i) {
+            d.classList.remove('active','filled');
+            if (i === currentBahn) { d.classList.add('active'); }
+            else if (players.some(function(p) { return scores[p][i] > 0; })) { d.classList.add('filled'); }
+        });
+    }
+
+    // ===== RENDER =====
+    function render() {
+        const par = pars[currentBahn];
+        document.getElementById('label-num').textContent = 'BAHN ' + (currentBahn+1) + ' VON 18';
+        document.getElementById('label-bahn').textContent = 'Bahn ' + (currentBahn+1);
+        document.getElementById('label-par').textContent = 'Ziel: ' + par + ' Schläge';
+
+        const area = document.getElementById('input-area');
+        area.innerHTML = '';
+        players.forEach(function(p) {
+            const s = scores[p][currentBahn];
+            const row = document.createElement('div');
+            row.className = 'score-row' + (s > 0 ? ' active-row' : '');
+
+            const nameEl = document.createElement('span');
+            nameEl.className = 'name'; nameEl.textContent = p;
+
+            const ctrl = document.createElement('div');
+            ctrl.className = 'score-controls';
+
+            const btnM = document.createElement('button');
+            btnM.className = 'btn-plus-minus btn-minus'; btnM.textContent = '−';
+
+            const val = document.createElement('span');
+            val.className = 'score-value'; val.textContent = s || '0';
+            if (s > 0 && s > par) val.style.color = 'var(--danger)';
+            else if (s > 0 && s === par) val.style.color = 'var(--warning)';
+            else if (s > 0 && s < par) val.style.color = 'var(--success)';
+
+            const btnP = document.createElement('button');
+            btnP.className = 'btn-plus-minus btn-plus'; btnP.textContent = '+';
+
+            (function(name) {
+                btnM.onclick = function() { update(name, -1); };
+                btnP.onclick = function() { update(name, 1); };
+            })(p);
+
+            ctrl.appendChild(btnM); ctrl.appendChild(val); ctrl.appendChild(btnP);
+            row.appendChild(nameEl); row.appendChild(ctrl);
+            area.appendChild(row);
+        });
+
+        // Viz bars
+        const viz = document.getElementById('viz-area');
+        viz.innerHTML = '';
+        players.forEach(function(p) {
+            const s = scores[p][currentBahn];
+            const maxV = Math.max(7, s, par);
+            const perc = (s / maxV) * 100;
+            const parP = (par / maxV) * 100;
+            let color = 'rgba(255,255,255,0.15)';
+            if (s > 0 && s > par) color = 'var(--danger)';
+            else if (s > 0 && s === par) color = 'var(--warning)';
+            else if (s > 0 && s < par) color = 'var(--success)';
+            const rowEl = document.createElement('div');
+            rowEl.className = 'player-bar-row';
+            rowEl.innerHTML =
+                '<span class="name">' + p + '</span>' +
+                '<div class="bar-bg">' +
+                    '<div class="par-marker" style="left:' + parP + '%"></div>' +
+                    '<div class="bar-fill" style="width:' + perc + '%; background:' + color + '"></div>' +
+                '</div>' +
+                '<span class="bar-score">' + (s || '0') + '</span>';
+            viz.appendChild(rowEl);
+        });
+
+        updateDots();
+        saveState();
+    }
+
+    function update(p, d) {
+        scores[p][currentBahn] = Math.max(0, scores[p][currentBahn] + d);
+        render();
+        const allFilled = players.every(function(pl) { return scores[pl][currentBahn] > 0; });
+        if (allFilled && currentBahn < 17) {
+            const next = currentBahn + 1;
+            showToast('✓ Weiter zu Bahn ' + (next + 1));
+            setTimeout(function() { currentBahn = next; render(); }, 2500);
+        }
+    }
+
+    function changeBahn(d) { currentBahn = Math.max(0, Math.min(17, currentBahn+d)); render(); }
+
+    function saveState() {
+        try {
+            localStorage.setItem('mg_final_scores', JSON.stringify(scores));
+            localStorage.setItem('mg_final_players', JSON.stringify(players));
+            localStorage.setItem('mg_final_bahn', currentBahn);
+        } catch(e) {}
+    }
+
+    // ===== TOAST =====
+    function showToast(msg) {
+        var t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(function() { t.classList.remove('show'); }, 2400);
+    }
+
+    // ===== PLAYER COLORS =====
+    var PLAYER_COLORS = [
+        { solid: '#00f2fe', glow: 'rgba(0,242,254,0.5)', muted: 'rgba(0,242,254,0.2)' },
+        { solid: '#a78bfa', glow: 'rgba(167,139,250,0.5)', muted: 'rgba(167,139,250,0.2)' },
+        { solid: '#fb923c', glow: 'rgba(251,146,60,0.5)',  muted: 'rgba(251,146,60,0.2)' },
+        { solid: '#34d399', glow: 'rgba(52,211,153,0.5)',  muted: 'rgba(52,211,153,0.2)' },
+        { solid: '#f472b6', glow: 'rgba(244,114,182,0.5)', muted: 'rgba(244,114,182,0.2)' },
+        { solid: '#fbbf24', glow: 'rgba(251,191,36,0.5)',  muted: 'rgba(251,191,36,0.2)' },
+    ];
+    function playerColor(idx) { return PLAYER_COLORS[idx % PLAYER_COLORS.length]; }
+
+    // ===== OVERVIEW =====
+    function showOverview() {
+        document.getElementById('overview-screen').classList.add('active');
+        renderOverview();
+    }
+    function closeOverview() { document.getElementById('overview-screen').classList.remove('active'); }
+
+    function renderOverview() {
+        var c = document.getElementById('overview-content');
+        c.innerHTML = '';
+
+        var parSum = pars.reduce(function(a,b){return a+b;},0);
+        var bahnenGespielt = 0;
+        for (var b=0;b<18;b++) {
+            if (players.some(function(p){return scores[p][b]>0;})) bahnenGespielt++;
+        }
+
+        // ── KPI Cards ──────────────────────────────────────────
+        var kpiHtml = '<div class="pbi-kpi-row">';
+        // Best player so far
+        var bestName = '–'; var bestSum = 9999;
+        players.forEach(function(p) {
+            var s = scores[p].reduce(function(a,b){return a+b;},0);
+            if (s < bestSum && s > 0) { bestSum = s; bestName = p.split(' ')[0]; }
+        });
+        kpiHtml += '<div class="pbi-kpi"><div class="pbi-kpi-val" style="-webkit-text-fill-color:var(--warning);color:var(--warning)">'+bahnenGespielt+'<span style="font-size:0.75rem;opacity:0.5">/18</span></div><div class="pbi-kpi-label">Bahnen</div></div>';
+        kpiHtml += '<div class="pbi-kpi"><div class="pbi-kpi-val" style="-webkit-text-fill-color:var(--success);color:var(--success)">'+bestName+'</div><div class="pbi-kpi-label">Führend</div></div>';
+
+        // Total par played
+        var parPlayed = 0;
+        for(var b=0;b<bahnenGespielt;b++) parPlayed+=pars[b];
+        kpiHtml += '<div class="pbi-kpi"><div class="pbi-kpi-val">'+parSum+'</div><div class="pbi-kpi-label">Gesamt-Par</div></div>';
+        kpiHtml += '</div>';
+        c.insertAdjacentHTML('beforeend', kpiHtml);
+
+        // ── Grouped Bar Chart ──────────────────────────────────
+        var maxScore = 1;
+        for (var b=0;b<18;b++) {
+            players.forEach(function(p){ if(scores[p][b]>maxScore) maxScore=scores[p][b]; });
+            if(pars[b]>maxScore) maxScore=pars[b];
+        }
+        maxScore = Math.max(maxScore, 6);
+        var chartH = 108;
+
+        // Build legend
+        var legendHtml = '<div class="pbi-chart-legend">';
+        players.forEach(function(p,pi) {
+            var col = playerColor(pi);
+            legendHtml += '<div class="pbi-legend-item"><div class="pbi-legend-dot" style="background:'+col.solid+'"></div>'+p.split(' ')[0]+'</div>';
+        });
+        legendHtml += '<div class="pbi-legend-item"><div class="pbi-legend-dot" style="background:rgba(255,234,0,0.7);border-radius:50%"></div>Par</div>';
+        legendHtml += '</div>';
+
+        var barW = players.length > 0 ? Math.max(10, Math.min(20, Math.floor(200/players.length))) : 18;
+        var groupW = players.length * (barW+2) + 8;
+
+        var chartHtml = '<div class="pbi-chart-card">';
+        chartHtml += '<div class="pbi-chart-title">SCHLÄGE PRO BAHN ' + legendHtml + '</div>';
+        chartHtml += '<div class="pbi-chart-scroll"><div class="pbi-grouped-chart" id="pbi-chart-inner" style="min-width:'+(18*groupW+20)+'px">';
+
+        // Grid lines
+        chartHtml += '<div class="pbi-gridlines">';
+        var gridVals = [maxScore, Math.round(maxScore*0.66), Math.round(maxScore*0.33), 0];
+        gridVals.forEach(function(v) {
+            var isPar = (v===2||v===3);
+            chartHtml += '<div class="pbi-gridline'+(isPar?' pbi-gridline-par':'')+'"></div>';
+        });
+        chartHtml += '</div>';
+
+        for (var i=0;i<18;i++) {
+            var par = pars[i];
+            var allDone = players.length>0 && players.every(function(p){return scores[p][i]>0;});
+            var isCur = (i===currentBahn);
+            var cls = 'pbi-hole-group' + (isCur?' is-current':'') + (allDone?' is-done':'');
+            chartHtml += '<div class="'+cls+'" data-hole="'+i+'" onclick="currentBahn='+i+';closeOverview();render()" style="width:'+groupW+'px">';
+            chartHtml += '<div class="pbi-bars-row" style="width:'+(players.length*(barW+2)-2)+'px">';
+
+            if (players.length === 0) {
+                chartHtml += '<div class="pbi-bar-wrap" style="width:'+barW+'px"><div class="pbi-bar" style="height:4px;background:rgba(255,255,255,0.1);width:'+barW+'px"></div></div>';
+            } else {
+                players.forEach(function(p, pi) {
+                    var s = scores[p][i];
+                    var col = playerColor(pi);
+                    var barH = s > 0 ? Math.max(4, Math.round((s/maxScore)*chartH)) : 3;
+                    var barColor, barShadow;
+                    if (s===0) { barColor='rgba(255,255,255,0.08)'; barShadow='none'; }
+                    else { barColor=col.solid; barShadow='0 -2px 8px '+col.glow; }
+
+                    chartHtml += '<div class="pbi-bar-wrap" style="width:'+barW+'px">';
+                    if (s>0) chartHtml += '<div class="pbi-bar-val">'+(s>0?s:'')+'</div>';
+                    chartHtml += '<div class="pbi-bar" style="height:'+barH+'px;width:'+barW+'px;background:'+barColor+';box-shadow:'+barShadow+'"></div>';
+                    chartHtml += '</div>';
+                });
+            }
+
+            // Par marker dot at par height
+            var parH = Math.round((par/maxScore)*chartH);
+            chartHtml += '<div style="position:absolute;bottom:'+(parH-2)+'px;left:0;right:0;height:2px;background:rgba(255,234,0,0.35);border-radius:1px;pointer-events:none"></div>';
+
+            chartHtml += '</div>';
+            chartHtml += '<div class="pbi-hole-label">'+(i+1)+'</div>';
+            chartHtml += '</div>';
+        }
+
+        chartHtml += '</div></div></div>';
+        c.insertAdjacentHTML('beforeend', chartHtml);
+
+        // ── Cumulative Score Line Chart ───────────────────────
+        if (players.length > 0 && bahnenGespielt > 0) {
+            var lineCard = '<div class="pbi-chart-card">';
+            lineCard += '<div class="pbi-chart-title">KUMULATIVER SCORE<div class="pbi-chart-legend">';
+            players.forEach(function(p,pi){
+                var col=playerColor(pi);
+                lineCard+='<div class="pbi-legend-item"><div class="pbi-legend-dot" style="background:'+col.solid+'"></div>'+p.split(' ')[0]+'</div>';
+            });
+            lineCard += '</div></div>';
+
+            var svgW = 320; var svgH = 90; var padL=8; var padR=8; var padT=12; var padB=16;
+            var pts = bahnenGespielt + 1;
+            var xStep = (svgW - padL - padR) / Math.max(1, pts-1);
+
+            // Compute cumulative per player
+            var cumData = players.map(function(p) {
+                var arr = [0]; var cum = 0;
+                for(var b=0;b<18;b++) { cum+=scores[p][b]; arr.push(cum); }
+                return arr;
+            });
+            var parCum = [0]; var pc=0;
+            for(var b=0;b<18;b++){ pc+=pars[b]; parCum.push(pc); }
+
+            var allVals = [];
+            cumData.forEach(function(a){ allVals = allVals.concat(a.slice(0,pts)); });
+            parCum.slice(0,pts).forEach(function(v){ allVals.push(v); });
+            var minV = Math.min.apply(null,allVals); var maxV2 = Math.max.apply(null,allVals);
+            var range = Math.max(1, maxV2-minV);
+
+            function toX(i){ return padL + i*xStep; }
+            function toY(v){ return padT + (1-(v-minV)/range)*(svgH-padT-padB); }
+
+            var svg = '<svg class="pbi-line-svg" viewBox="0 0 '+svgW+' '+svgH+'" preserveAspectRatio="none">';
+
+            // Par line dashed
+            var parPts = '';
+            for(var i=0;i<pts;i++) parPts+=(i===0?'M':'L')+toX(i).toFixed(1)+' '+toY(parCum[i]).toFixed(1);
+            svg += '<path d="'+parPts+'" fill="none" stroke="rgba(255,234,0,0.4)" stroke-width="1.5" stroke-dasharray="4,3"/>';
+
+            // Player lines
+            cumData.forEach(function(arr,pi){
+                var col=playerColor(pi);
+                var d='';
+                for(var i=0;i<pts;i++) d+=(i===0?'M':'L')+toX(i).toFixed(1)+' '+toY(arr[i]).toFixed(1);
+                // Area fill
+                var area=d+'L'+toX(pts-1).toFixed(1)+' '+(svgH-padB)+' L'+padL.toFixed(1)+' '+(svgH-padB)+' Z';
+                svg+='<defs><linearGradient id="lg'+pi+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+col.solid+'" stop-opacity="0.25"/><stop offset="100%" stop-color="'+col.solid+'" stop-opacity="0"/></linearGradient></defs>';
+                svg+='<path d="'+area+'" fill="url(#lg'+pi+')" />';
+                svg+='<path d="'+d+'" fill="none" stroke="'+col.solid+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+                // Last dot
+                var lx=toX(pts-1); var ly=toY(arr[pts-1]);
+                svg+='<circle cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" r="3" fill="'+col.solid+'" stroke="#0a0f1e" stroke-width="1.5"/>';
+            });
+
+            // X-axis labels (every 3 holes)
+            for(var i=0;i<pts;i++){
+                if(i>0 && (i%3===0||i===pts-1)){
+                    svg+='<text x="'+toX(i).toFixed(1)+'" y="'+(svgH-2)+'" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.3)" font-family="system-ui">'+i+'</text>';
+                }
+            }
+            svg += '</svg>';
+            lineCard += svg + '</div>';
+            c.insertAdjacentHTML('beforeend', lineCard);
+        }
+
+        // ── Score Matrix Table ────────────────────────────────
+        if (players.length > 0) {
+            var tblCard = '<div class="pbi-chart-card"><div class="pbi-chart-title">SCORE-MATRIX</div>';
+            tblCard += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="pbi-table"><thead><tr><th>Spieler</th>';
+            for(var b=0;b<18;b++) tblCard+='<th>'+(b+1)+'</th>';
+            tblCard+='<th>∑</th></tr></thead><tbody>';
+            players.forEach(function(p,pi){
+                var col=playerColor(pi);
+                var total=scores[p].reduce(function(a,b){return a+b;},0);
+                tblCard+='<tr><td style="color:'+col.solid+';max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.split(' ')[0]+'</td>';
+                for(var b=0;b<18;b++){
+                    var s=scores[p][b]; var par=pars[b];
+                    var cls2='pbi-cell-empty';
+                    if(s>0){
+                        if(s<par) cls2='pbi-cell-under';
+                        else if(s===par) cls2='pbi-cell-par';
+                        else cls2='pbi-cell-over';
+                    }
+                    tblCard+='<td class="'+cls2+'">'+(s||'·')+'</td>';
+                }
+                tblCard+='<td style="color:'+col.solid+';font-weight:800">'+total+'</td></tr>';
+            });
+            tblCard+='<tr class="par-row"><td>Par</td>';
+            for(var b=0;b<18;b++) tblCard+='<td>'+pars[b]+'</td>';
+            tblCard+='<td>'+parSum+'</td></tr>';
+            tblCard+='</tbody></table></div></div>';
+            c.insertAdjacentHTML('beforeend', tblCard);
+        }
+    }
+
+    // ===== RESULTS =====
+    function showBI() {
+        document.getElementById('bi-dashboard').classList.add('active');
+        var parSum = pars.reduce(function(a,b){return a+b;},0);
+        var stats = players.map(function(p) {
+            var sum = scores[p].reduce(function(a,b){return a+b;},0);
+            var played = scores[p].filter(function(s){return s>0;}).length;
+            return { name:p, sum:sum, diff:sum-parSum, played:played };
+        }).sort(function(a,b){return a.sum-b.sum;});
+
+        var html = '<div class="result-card">';
+        stats.forEach(function(s, i) {
+            var diffStr = s.diff>0?'+'+s.diff:(s.diff===0?'±0':''+s.diff);
+            var diffColor = s.diff>0?'var(--danger)':(s.diff<0?'var(--success)':'var(--warning)');
+            var medal = ['🥇','🥈','🥉'][i] || '<span class="rank-badge">'+(i+1)+'</span>';
+            html += '<div class="result-row'+(i===0?' first':'')+'">'+
+                '<span class="result-name">'+medal+' '+s.name+'</span>'+
+                '<span class="result-score">'+s.sum+' <small style="color:'+diffColor+';font-size:0.8rem;">('+diffStr+')</small></span>'+
+            '</div>';
+        });
+        html += '</div>';
+
+        // Per-hole summary
+        html += '<div class="section-label" style="margin-top:8px;">BAHN-DETAILS</div>';
+        html += '<div class="result-card">';
+        for (var b = 0; b < 18; b++) {
+            var anyS = players.some(function(p){return scores[p][b]>0;});
+            if (!anyS) continue;
+            html += '<div class="result-row"><span style="color:rgba(255,255,255,0.4);font-size:0.8rem;font-weight:700;">Bahn '+(b+1)+'</span><span style="display:flex;gap:12px;">';
+            players.forEach(function(p) {
+                var s = scores[p][b];
+                var par = pars[b];
+                var col = s>par?'var(--danger)':(s===par?'var(--warning)':'var(--success)');
+                html += '<span style="font-size:0.8rem;font-variant-numeric:tabular-nums;"><span style="color:rgba(255,255,255,0.4);">'+p.split(' ')[0]+' </span><b style="color:'+col+'">'+s+'</b></span>';
+            });
+            html += '</span></div>';
+        }
+        html += '</div>';
+
+        var played = stats.length > 0 ? stats[0].played : 0;
+        html += '<p style="text-align:center;color:rgba(255,255,255,0.3);margin-top:12px;font-size:0.8rem;">'+played+' von 18 Bahnen gespielt</p>';
+        document.getElementById('final-stats').innerHTML = html;
+    }
+    function closeBI() { document.getElementById('bi-dashboard').classList.remove('active'); }
+
+    // ===== RESET =====
+    function doReset() {
+        hideModal('deleteModal');
+        localStorage.removeItem('mg_final_scores');
+        localStorage.removeItem('mg_final_players');
+        localStorage.removeItem('mg_final_bahn');
+        location.reload();
+    }
+
+    // ===== EXPORT =====
+    function getStats() {
+        var parSum = pars.reduce(function(a,b){return a+b;},0);
+        return players.map(function(p) {
+            var sum = scores[p].reduce(function(a,b){return a+b;},0);
+            return { name:p, sum:sum, diff:sum-parSum };
+        }).sort(function(a,b){return a.sum-b.sum;});
+    }
+
+    function doExportCSV() {
+        var rows = ['Spieler,' + Array.from({length:18},function(_,i){return 'Bahn '+(i+1);}).join(',') + ',Gesamt'];
+        players.forEach(function(p) {
+            var row = [p].concat(scores[p]).concat([scores[p].reduce(function(a,b){return a+b;},0)]);
+            rows.push(row.join(','));
+        });
+        rows.push('Par,' + pars.join(',') + ',' + pars.reduce(function(a,b){return a+b;},0));
+        var blob = new Blob([rows.join('\n')], {type:'text/csv;charset=utf-8;'});
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = 'minigolf_' + new Date().toISOString().slice(0,10) + '.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('📄 CSV gespeichert');
+    }
+
+    function doExportText() {
+        var lines = ['⛳ MINIGOLF ERGEBNIS', new Date().toLocaleDateString('de-DE'), ''];
+        var stats = getStats();
+        var medals = ['🥇','🥈','🥉'];
+        stats.forEach(function(s,i) {
+            var diffStr = s.diff>0?'+'+s.diff:(s.diff===0?'±0':''+s.diff);
+            lines.push((medals[i]||'  ') + ' ' + s.name + ': ' + s.sum + ' (' + diffStr + ')');
+        });
+        lines.push('');
+        lines.push('Bahnen: ' + players.map(function(p){ return p+' '+scores[p].join('-'); }).join(' | '));
+        var text = lines.join('\n');
+        if (navigator.share) {
+            navigator.share({ title:'Minigolf Ergebnis', text:text }).catch(function(){});
+        } else if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(function() { showToast('📋 Text kopiert!'); });
+        } else {
+            var ta = document.createElement('textarea');
+            ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+            document.body.removeChild(ta); showToast('📋 Text kopiert!');
+        }
+    }
+</script>
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('./sw.js');
+        });
+    }
+</script>
+</body>
+</html>
