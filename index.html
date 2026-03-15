@@ -235,12 +235,18 @@ html { background: #000; }
   font-size: 0.72rem; font-weight: 600; color: var(--gold); letter-spacing: 0.5px;
 }
 
-/* Progress track: 2 rows of 9 */
+/* Progress track: 2 rows of 9 portrait, 1 row of 18 landscape */
 .progress-track {
   display: grid;
   grid-template-columns: repeat(9, 1fr);
   gap: 5px;
   padding: 0 8px 20px;
+}
+@media (orientation: landscape) {
+  .progress-track {
+    grid-template-columns: repeat(18, 1fr);
+    padding: 0 8px 12px;
+  }
 }
 .pdot {
   width: 100%; aspect-ratio: 1;
@@ -254,6 +260,19 @@ html { background: #000; }
   background: var(--accent); border-color: var(--accent);
   transform: scale(1.25);
   box-shadow: 0 0 12px rgba(41,151,255,0.5);
+}
+
+/* Rotate hint */
+.rotate-hint {
+  display: none;
+  align-items: center; justify-content: center; gap: 8px;
+  padding: 8px 16px; margin: 0 16px 8px;
+  background: rgba(41,151,255,0.08); border: 1px solid rgba(41,151,255,0.2);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem; color: var(--accent); font-weight: 500;
+}
+@media (orientation: portrait) and (max-width: 500px) {
+  .rotate-hint { display: flex; }
 }
 
 /* Score cards */
@@ -289,6 +308,11 @@ html { background: #000; }
 }
 .score-btn-plus {
   background: var(--accent); color: white;
+}
+.score-btn-plus:disabled {
+  background: #1a1a1a; color: rgba(245,245,247,0.2);
+  cursor: not-allowed; pointer-events: none;
+  border: 1px solid var(--border);
 }
 
 /* Colour bar at bottom of score card */
@@ -709,6 +733,8 @@ html { background: #000; }
     <div class="progress-track" id="progressTrack"></div>
   </div>
 
+  <div class="rotate-hint">⟳ Gerät drehen für alle 18 Bahnen</div>
+
   <div class="score-section" id="scoreSection"></div>
 
   <div class="quickstats" id="quickstats"></div>
@@ -1011,7 +1037,7 @@ function render() {
       '<div class="score-controls">'+
         '<button class="score-btn score-btn-minus" data-p="'+p+'">−</button>'+
         '<div class="score-num" style="color:'+(isHio?'var(--hio)':(isSeven?'var(--red)':scoreColor))+'">'+s+'</div>'+
-        '<button class="score-btn score-btn-plus" data-p="'+p+'">+</button>'+
+        '<button class="score-btn score-btn-plus" data-p="'+p+'"'+(s>=7?' disabled':'')+'>+</button>'+
       '</div>';
 
     card.querySelector('.score-btn-minus').onclick = function() { updateScore(p, -1); };
@@ -1046,9 +1072,20 @@ function renderQuickstats() {
     '<div class="qstat"><div class="qstat-val">'+parSum+'</div><div class="qstat-label">Par bisher</div></div>';
 }
 
+var autoAdvanceTimer = null;
+
 function updateScore(p, d) {
   scores[p][currentBahn] = Math.max(0, Math.min(7, scores[p][currentBahn] + d));
   render();
+  // Auto-advance after 3s when all players have scored this hole
+  if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+  var allScored = players.every(function(pl) { return scores[pl][currentBahn] > 0; });
+  if (allScored && currentBahn < 17) {
+    autoAdvanceTimer = setTimeout(function() {
+      autoAdvanceTimer = null;
+      changeBahn(1);
+    }, 3000);
+  }
 }
 
 function changeBahn(d) {
