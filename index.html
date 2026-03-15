@@ -1049,12 +1049,6 @@ function renderQuickstats() {
 function updateScore(p, d) {
   scores[p][currentBahn] = Math.max(0, Math.min(7, scores[p][currentBahn] + d));
   render();
-  var allFilled = players.every(function(pl){ return scores[pl][currentBahn] > 0; });
-  if (allFilled && currentBahn < 17) {
-    var next = currentBahn + 1;
-    showToast('✓ Weiter zu Bahn ' + (next+1));
-    setTimeout(function() { currentBahn = next; render(); }, 2000);
-  }
 }
 
 function changeBahn(d) {
