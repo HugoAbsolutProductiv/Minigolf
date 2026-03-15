@@ -1194,16 +1194,20 @@ function renderLeaderboard() {
   });
 
   // ── Cumulative Line Chart (big) ──
-  var played2 = 0;
-  for (var b = 0; b < 18; b++) {
-    if (players.some(function(p){ return scores[p][b] > 0; })) played2++;
-  }
-  if (players.length > 0 && played2 > 0) {
-    var pts = 19; // always show all 18 holes (0..18)
-    var svgW = 500; var svgH = 180;
-    var padL = 28; var padR = 12; var padT = 16; var padB = 24;
+  // Per-player last played hole index (1-based, 0 = not started)
+  var playerLastPlayed = players.map(function(p) {
+    var last = 0;
+    for (var b = 0; b < 18; b++) { if (scores[p][b] > 0) last = b + 1; }
+    return last;
+  });
+  var maxPlayed = Math.max.apply(null, playerLastPlayed.concat([1]));
 
-    // cumulative per player
+  if (players.length > 0 && maxPlayed > 0) {
+    var pts = maxPlayed + 1; // x-axis: point 0 (start) through point maxPlayed
+    var svgW = Math.max(320, pts * 24); var svgH = 180;
+    var padL = 28; var padR = 48; var padT = 16; var padB = 24;
+
+    // cumulative per player (full 18+1 for index safety, we only draw up to lastPlayed)
     var cumData = players.map(function(p) {
       var arr = [0]; var cum = 0;
       for (var b = 0; b < 18; b++) { cum += scores[p][b]; arr.push(cum); }
@@ -1213,8 +1217,12 @@ function renderLeaderboard() {
     for (var b = 0; b < 18; b++) { pc2 += pars[b]; parCum.push(pc2); }
 
     var allVals = [];
-    cumData.forEach(function(a){ allVals = allVals.concat(a.slice(0, pts)); });
+    cumData.forEach(function(a, pi) {
+      var lp = playerLastPlayed[pi];
+      if (lp > 0) allVals = allVals.concat(a.slice(0, lp + 1));
+    });
     parCum.slice(0, pts).forEach(function(v){ allVals.push(v); });
+    allVals.push(0);
     var minV = Math.min.apply(null, allVals);
     var maxV2 = Math.max.apply(null, allVals);
     var range = Math.max(2, maxV2 - minV);
@@ -1236,27 +1244,30 @@ function renderLeaderboard() {
       html += '<text x="'+(padL-4)+'" y="'+(yPos+4).toFixed(1)+'" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.25)" font-family="system-ui">'+Math.round(yVal)+'</text>';
     }
 
-    // Par dashed line
+    // Par dashed line (only up to maxPlayed)
     var parPath = '';
     for (var xi = 0; xi < pts; xi++) parPath += (xi===0?'M':'L')+toX(xi).toFixed(1)+' '+toY(parCum[xi]).toFixed(1);
     html += '<path d="'+parPath+'" fill="none" stroke="rgba(255,214,10,0.45)" stroke-width="1.5" stroke-dasharray="5,3"/>';
 
-    // Player lines + area fills
+    // Player lines + area fills – each line ends at that player's last played hole
     cumData.forEach(function(arr, pi) {
+      var lastPt = playerLastPlayed[pi]; // 0 = not started
+      if (lastPt < 1) return;
       var col = COLORS[pi % COLORS.length];
+      var numPts = lastPt + 1; // points 0..lastPt
       var d = '';
-      for (var xi = 0; xi < pts; xi++) d += (xi===0?'M':'L')+toX(xi).toFixed(1)+' '+toY(arr[xi]).toFixed(1);
-      var area = d + 'L'+toX(pts-1).toFixed(1)+' '+(svgH-padB)+' L'+padL.toFixed(1)+' '+(svgH-padB)+' Z';
+      for (var xi = 0; xi < numPts; xi++) d += (xi===0?'M':'L')+toX(xi).toFixed(1)+' '+toY(arr[xi]).toFixed(1);
+      var area = d + 'L'+toX(lastPt).toFixed(1)+' '+(svgH-padB)+' L'+padL.toFixed(1)+' '+(svgH-padB)+' Z';
       html += '<defs><linearGradient id="lg'+pi+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+col+'" stop-opacity="0.18"/><stop offset="100%" stop-color="'+col+'" stop-opacity="0"/></linearGradient></defs>';
       html += '<path d="'+area+'" fill="url(#lg'+pi+')" />';
       html += '<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
-      // Dots at each point
-      for (var xi = 0; xi < pts; xi++) {
-        html += '<circle cx="'+toX(xi).toFixed(1)+'" cy="'+toY(arr[xi]).toFixed(1)+'" r="'+(xi===pts-1?'4':'2.5')+'" fill="'+col+'" stroke="#000" stroke-width="1.5"/>';
+      // Dots at each played point
+      for (var xi = 0; xi < numPts; xi++) {
+        html += '<circle cx="'+toX(xi).toFixed(1)+'" cy="'+toY(arr[xi]).toFixed(1)+'" r="'+(xi===lastPt?'4':'2.5')+'" fill="'+col+'" stroke="#000" stroke-width="1.5"/>';
       }
-      // Name label at end
-      var lx = toX(pts-1); var ly = toY(arr[pts-1]);
-      html += '<text x="'+(lx+6).toFixed(1)+'" y="'+(ly+4).toFixed(1)+'" font-size="9" fill="'+col+'" font-family="system-ui" font-weight="700">'+(playerNames[pi]||players[pi]).split(' ')[0]+'</text>';
+      // Full name label at player's last played point
+      var lx = toX(lastPt); var ly = toY(arr[lastPt]);
+      html += '<text x="'+(lx+6).toFixed(1)+'" y="'+(ly+4).toFixed(1)+'" font-size="9" fill="'+col+'" font-family="system-ui" font-weight="700">'+(playerNames[pi]||players[pi])+'</text>';
     });
 
     // X-axis hole labels
@@ -1266,6 +1277,75 @@ function renderLeaderboard() {
       }
     }
     html += '</svg></div></div>';
+  }
+
+  // ── Hole-in-One Highlights ──
+  var hioList = players.map(function(p, pi) {
+    var holes = [];
+    for (var b = 0; b < 18; b++) { if (scores[p][b] === 1) holes.push(b + 1); }
+    return { name: playerNames[pi]||p, pi: pi, count: holes.length, holes: holes };
+  }).filter(function(h) { return h.count > 0; })
+    .sort(function(a, b) { return b.count - a.count; });
+
+  if (hioList.length > 0) {
+    html += '<div style="margin:0 16px 16px">';
+    html += '<div class="lb-holes-title">⛳ HOLE IN ONE HIGHLIGHTS</div>';
+    html += '<div class="lb-card"><div class="lb-rows-wrap">';
+    var hioMedals = ['🥇','🥈','🥉'];
+    hioList.forEach(function(h, i) {
+      var col = COLORS[h.pi % COLORS.length];
+      html += '<div class="lb-row">'+
+        '<div class="lb-rank">'+(hioMedals[i]||'⛳')+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div class="lb-name" style="color:'+col+'">'+h.name+'</div>'+
+          '<div style="font-size:0.65rem;color:var(--text3);margin-top:1px">Bahn '+h.holes.join(', ')+'</div>'+
+        '</div>'+
+        '<div style="font-size:1.2rem;font-weight:700;color:var(--gold)">×'+h.count+'</div>'+
+      '</div>';
+    });
+    html += '</div></div></div>';
+  }
+
+  // ── Bahn-Statistik ──
+  var bahnStats = [];
+  for (var b = 0; b < 18; b++) {
+    var playedOn = players.filter(function(p) { return scores[p][b] > 0; });
+    if (playedOn.length === 0) continue;
+    var totalSt = playedOn.reduce(function(sum, p) { return sum + scores[p][b]; }, 0);
+    var avg = totalSt / playedOn.length;
+    var hios = players.filter(function(p) { return scores[p][b] === 1; }).length;
+    var sevens = players.filter(function(p) { return scores[p][b] === 7; }).length;
+    var diff = avg - pars[b];
+    bahnStats.push({ bahn: b+1, par: pars[b], avg: avg, diff: diff, hios: hios, sevens: sevens, played: playedOn.length });
+  }
+
+  if (bahnStats.length > 0) {
+    var sortedStats = bahnStats.slice().sort(function(a,b) { return b.diff - a.diff; });
+    html += '<div style="margin:0 16px 20px">';
+    html += '<div class="lb-holes-title">📊 BAHN-STATISTIK</div>';
+    html += '<div class="lb-card"><div class="lb-rows-wrap">';
+    sortedStats.forEach(function(s, rank) {
+      var diffColor = s.diff > 0.3 ? 'var(--red)' : (s.diff < -0.2 ? 'var(--accent2)' : 'var(--gold)');
+      var diffLabel = s.diff > 0.3 ? '🔴 Schwer' : (s.diff < -0.2 ? '🟢 Leicht' : '🟡 Normal');
+      var diffStr = (s.diff > 0 ? '+' : '') + s.diff.toFixed(1);
+      html += '<div class="lb-row" style="align-items:flex-start;padding:10px 0">'+
+        '<div style="min-width:28px;font-size:0.7rem;color:var(--text3);padding-top:2px">#'+(rank+1)+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-weight:700;font-size:0.85rem">Bahn '+s.bahn+
+            '<span style="font-weight:400;font-size:0.72rem;color:var(--text3);margin-left:6px">Par '+s.par+'</span>'+
+          '</div>'+
+          '<div style="font-size:0.7rem;color:var(--text3);margin-top:2px">'+diffLabel+
+            (s.hios > 0 ? '  ⛳×'+s.hios : '')+
+            (s.sevens > 0 ? '  💀×'+s.sevens : '')+
+          '</div>'+
+        '</div>'+
+        '<div style="text-align:right">'+
+          '<div style="font-size:0.9rem;font-weight:700">Ø '+s.avg.toFixed(1)+'</div>'+
+          '<div style="font-size:0.7rem;font-weight:700;color:'+diffColor+'">'+diffStr+' vs Par</div>'+
+        '</div>'+
+      '</div>';
+    });
+    html += '</div></div></div>';
   }
 
   document.getElementById('lbContent').innerHTML = html;
@@ -1297,7 +1377,7 @@ function renderOverview() {
   // Legend
   var legendHtml = '<div class="barchart-legend">';
   players.forEach(function(p,pi){
-    legendHtml += '<div class="barchart-legend-item"><div class="barchart-legend-dot" style="background:'+COLORS[pi%COLORS.length]+'"></div>'+p.split(' ')[0]+'</div>';
+    legendHtml += '<div class="barchart-legend-item"><div class="barchart-legend-dot" style="background:'+COLORS[pi%COLORS.length]+'"></div>'+(playerNames[pi]||p).split(' ')[0]+'</div>';
   });
   legendHtml += '<div class="barchart-legend-item"><div class="barchart-legend-dot" style="background:rgba(255,214,10,0.7);border-radius:50%"></div>Par</div>';
   legendHtml += '<div class="barchart-legend-item"><span style="font-size:0.75rem">⛳</span>Hole in One</div>';
