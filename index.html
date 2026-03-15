@@ -1001,14 +1001,7 @@ function render() {
     card.className = cardCls;
     var badge = isHio ? '<span class="hio-badge">⛳ Hole in One!</span>' : (isSeven ? '<span class="seven-badge">💀 Max!</span>' : '');
 
-    // Build all-player totals summary
-    var totalsHtml = '<div class="score-player-totals">';
-    players.forEach(function(pp, ppi) {
-      var ptot = scores[pp].reduce(function(a,b){return a+b;},0);
-      var pcol = COLORS[ppi % COLORS.length];
-      totalsHtml += '<span class="score-player-total-item" style="color:'+pcol+'">'+pp.split(' ')[0]+' <b>'+ptot+'</b></span>';
-    });
-    totalsHtml += '</div>';
+    var totalsHtml = '<div class="score-player-total" style="color:var(--text3);font-size:0.72rem;margin-top:2px">Gesamt: <b style="color:'+col+'">'+total+'</b></div>';
 
     card.innerHTML =
       '<div class="score-player-info">'+
