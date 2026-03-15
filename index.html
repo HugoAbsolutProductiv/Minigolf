@@ -395,6 +395,10 @@ html { background: #000; }
   gap: 14px;
 }
 .lb-row:last-child { border-bottom: none; }
+.lb-rows-wrap {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
 .lb-rank {
   font-family: 'DM Serif Display', serif; font-size: 1.6rem;
   min-width: 28px; line-height:1;
@@ -410,8 +414,12 @@ html { background: #000; }
   color: var(--text3); text-transform: uppercase;
   margin-bottom: 12px; padding: 0 4px;
 }
+.holes-grid-wrap {
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
 .holes-grid {
-  display: grid; grid-template-columns: repeat(9,1fr); gap: 4px;
+  display: grid; grid-template-columns: repeat(18, minmax(34px, 1fr)); gap: 4px;
+  min-width: 630px;
 }
 .hole-cell {
   background: #0f0f0f; border: 1px solid var(--border);
@@ -924,7 +932,7 @@ function buildPlayerList() {
   });
 }
 function addPlayer() {
-  if (setupPlayers.length >= 6) { showToast('⚠ Max. 6 Spieler'); return; }
+  if (setupPlayers.length >= 9) { showToast('⚠ Max. 9 Spieler'); return; }
   setupPlayers.push('');
   buildPlayerList();
   setTimeout(function() {
@@ -942,14 +950,20 @@ function startGame() {
   }
   players = [];
   scores = {};
+  var nameCount = {};
   setupPlayers.forEach(function(n) {
     var name = n.trim();
-    if (name) { players.push(name); scores[name] = new Array(18).fill(0); }
+    if (!name) return;
+    if (nameCount[name] === undefined) {
+      nameCount[name] = 1;
+    } else {
+      nameCount[name]++;
+      name = name + ' ' + nameCount[name];
+    }
+    players.push(name);
+    scores[name] = new Array(18).fill(0);
   });
   if (players.length === 0) { showToast('⚠ Mindestens 1 Spieler'); return; }
-  var nameSet = {};
-  var hasDup = players.some(function(n) { if (nameSet[n]) return true; nameSet[n] = true; return false; });
-  if (hasDup) { showToast('⚠ Spielernamen müssen eindeutig sein'); return; }
   currentBahn = 0;
   goToGame();
 }
@@ -1033,7 +1047,7 @@ function render() {
     var isSeven = s === 7;
     var cardCls = 'score-card' + (s > 0 ? ' has-score' : '') + (isHio ? ' hio' : '') + (isSeven ? ' seven' : '');
     card.className = cardCls;
-    var badge = isHio ? '<span class="hio-badge">⛳ Hole in One!</span>' : (isSeven ? '<span class="seven-badge">💀 Max!</span>' : '');
+    var badge = isHio ? '<span class="hio-badge">⛳ Hole in One!</span>' : (isSeven ? '<span class="seven-badge">■ Max</span>' : '');
 
     var totalsHtml = '<div class="score-player-total" style="color:var(--text3);font-size:0.72rem;margin-top:2px">Gesamt: <b style="color:'+col+'">'+total+'</b></div>';
 
@@ -1118,7 +1132,7 @@ function renderLeaderboard() {
   for (var b = 0; b < 18; b++) {
     if (players.some(function(p){ return scores[p][b] > 0; })) played++;
   }
-  var parSum = pars.reduce(function(a,b){return a+b;},0);
+  var parSum = 0; for (var b2=0; b2<played; b2++) parSum += pars[b2];
   document.getElementById('lbSub').textContent = 'Stand nach ' + played + ' von 18 Bahnen';
 
   var sorted = players.map(function(p,pi) {
@@ -1130,7 +1144,7 @@ function renderLeaderboard() {
   });
 
   var medals = ['🥇','🥈','🥉'];
-  var html = '<div class="lb-card">';
+  var html = '<div class="lb-card"><div class="lb-rows-wrap">';
   var rank = 0;
   sorted.forEach(function(s, i) {
     // Determine if tied with previous
@@ -1151,23 +1165,23 @@ function renderLeaderboard() {
       '</div>'+
     '</div>';
   });
-  html += '</div>';
+  html += '</div></div>';
 
   // Per player hole grid with HiO/7 markers
   sorted.forEach(function(s) {
     var col = COLORS[s.pi % COLORS.length];
     html += '<div style="margin:0 16px 12px">';
     html += '<div class="lb-holes-title" style="color:'+col+'">'+s.name+'</div>';
-    html += '<div class="holes-grid">';
+    html += '<div class="holes-grid-wrap"><div class="holes-grid">';
     for (var b = 0; b < 18; b++) {
       var sc = scores[s.name][b];
       var par = pars[b];
       var isHio = sc === 1; var isSeven = sc === 7;
       var cls = sc === 0 ? 'empty' : (isHio ? 'hio-cell' : (isSeven ? 'seven-cell' : (sc < par ? 'under' : (sc === par ? 'par-eq' : 'over'))));
-      var icon = isHio ? '⛳' : (isSeven ? '💀' : (sc||'·'));
+      var icon = isHio ? '⛳' : (sc||'·');
       html += '<div class="hole-cell '+cls+'"><div class="hole-cell-num">'+(b+1)+'</div><div class="hole-cell-score">'+icon+'</div></div>';
     }
-    html += '</div></div>';
+    html += '</div></div></div>';
   });
 
   // ── Cumulative Line Chart (big) ──
@@ -1278,7 +1292,7 @@ function renderOverview() {
   });
   legendHtml += '<div class="barchart-legend-item"><div class="barchart-legend-dot" style="background:rgba(255,214,10,0.7);border-radius:50%"></div>Par</div>';
   legendHtml += '<div class="barchart-legend-item"><span style="font-size:0.75rem">⛳</span>Hole in One</div>';
-  legendHtml += '<div class="barchart-legend-item"><span style="font-size:0.75rem">💀</span>Max (7 = schlecht)</div>';
+  legendHtml += '<div class="barchart-legend-item"><span style="font-size:0.75rem;color:var(--red)">■</span>Max (7)</div>';
   legendHtml += '</div>';
 
   var barW = players.length > 2 ? 14 : (players.length === 1 ? 22 : 18);
@@ -1330,7 +1344,7 @@ function renderOverview() {
         html += '<div class="barchart-bar-wrap" style="width:'+barW+'px">';
         if (s > 0) {
           var valCls = 'barchart-val'+(isHio?' hio-val':'')+(isSeven?' seven-val':'');
-          var icon = isHio ? '<div class="barchart-icon">⛳</div>' : (isSeven ? '<div class="barchart-icon">💀</div>' : '');
+          var icon = isHio ? '<div class="barchart-icon">⛳</div>' : '';
           html += icon + '<div class="'+valCls+'">'+s+'</div>';
         }
         html += '<div class="'+barCls+'" style="height:'+barH+'px;width:'+barW+'px;background:'+barColor+';box-shadow:'+barShadow+'"></div>';
