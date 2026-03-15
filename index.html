@@ -854,7 +854,8 @@ html { background: #000; }
 <script>
 // ====== STATE ======
 var pars = [2,2,3,3,2,3,3,3,3,2,2,2,3,2,3,3,3,3];
-var players = [];
+var players = [];       // internal unique keys
+var playerNames = [];   // display names (may be identical for duplicates)
 var scores = {};
 var currentBahn = 0;
 var currentScreen = 'setup';
@@ -955,19 +956,20 @@ function startGame() {
     if (inp) { var v = parseInt(inp.value); if (!isNaN(v)) pars[i] = v; }
   }
   players = [];
+  playerNames = [];
   scores = {};
   var nameCount = {};
   setupPlayers.forEach(function(n) {
-    var name = n.trim();
-    if (!name) return;
-    if (nameCount[name] === undefined) {
-      nameCount[name] = 1;
-    } else {
-      nameCount[name]++;
-      name = name + ' ' + nameCount[name];
+    var display = n.trim();
+    if (!display) return;
+    playerNames.push(display); // always original name for display
+    if (nameCount[display] === undefined) {
+      nameCount[display] = 0;
     }
-    players.push(name);
-    scores[name] = new Array(18).fill(0);
+    nameCount[display]++;
+    var key = nameCount[display] === 1 ? display : display + '__' + nameCount[display];
+    players.push(key);
+    scores[key] = new Array(18).fill(0);
   });
   if (players.length === 0) { showToast('⚠ Mindestens 1 Spieler'); return; }
   currentBahn = 0;
@@ -978,6 +980,7 @@ function resumeGame() {
   var cur = loadStr(KEY_CURRENT);
   if (!cur) return;
   players = cur.players;
+  playerNames = cur.playerNames || cur.players; // fallback for old saves
   scores = cur.scores;
   pars = cur.pars || pars;
   currentBahn = cur.currentBahn || 0;
@@ -1059,7 +1062,7 @@ function render() {
 
     card.innerHTML =
       '<div class="score-player-info">'+
-        '<div class="score-player-name" style="color:'+col+'">'+p+badge+'</div>'+
+        '<div class="score-player-name" style="color:'+col+'">'+(playerNames[pi]||p)+badge+'</div>'+
         totalsHtml+
       '</div>'+
       '<div class="score-controls">'+
@@ -1088,9 +1091,9 @@ function renderQuickstats() {
 
   // Leader
   var leaderName = '–'; var leaderScore = 9999;
-  players.forEach(function(p) {
+  players.forEach(function(p, pi) {
     var s = scores[p].reduce(function(a,b){return a+b;},0);
-    if (s > 0 && s < leaderScore) { leaderScore = s; leaderName = p.split(' ')[0]; }
+    if (s > 0 && s < leaderScore) { leaderScore = s; leaderName = (playerNames[pi]||p).split(' ')[0]; }
   });
 
   var qs = document.getElementById('quickstats');
@@ -1123,7 +1126,7 @@ function changeBahn(d) {
 
 // ====== SAVE CURRENT STATE ======
 function saveCurrentState() {
-  saveStr(KEY_CURRENT, { players: players, scores: scores, pars: pars, currentBahn: currentBahn });
+  saveStr(KEY_CURRENT, { players: players, playerNames: playerNames, scores: scores, pars: pars, currentBahn: currentBahn });
 }
 
 // ====== LEADERBOARD ======
@@ -1143,7 +1146,7 @@ function renderLeaderboard() {
 
   var sorted = players.map(function(p,pi) {
     var hios = scores[p].filter(function(s){ return s === 1; }).length;
-    return { name:p, pi:pi, sum: scores[p].reduce(function(a,b){return a+b;},0), hios: hios };
+    return { name: playerNames[pi]||p, key:p, pi:pi, sum: scores[p].reduce(function(a,b){return a+b;},0), hios: hios };
   }).sort(function(a,b){
     if (a.sum !== b.sum) return a.sum - b.sum;
     return b.hios - a.hios; // more HiOs = better on tiebreak
@@ -1180,7 +1183,7 @@ function renderLeaderboard() {
     html += '<div class="lb-holes-title" style="color:'+col+'">'+s.name+'</div>';
     html += '<div class="holes-grid-wrap"><div class="holes-grid">';
     for (var b = 0; b < 18; b++) {
-      var sc = scores[s.name][b];
+      var sc = scores[s.key][b];
       var par = pars[b];
       var isHio = sc === 1; var isSeven = sc === 7;
       var cls = sc === 0 ? 'empty' : (isHio ? 'hio-cell' : (isSeven ? 'seven-cell' : (sc < par ? 'under' : (sc === par ? 'par-eq' : 'over'))));
@@ -1253,7 +1256,7 @@ function renderLeaderboard() {
       }
       // Name label at end
       var lx = toX(pts-1); var ly = toY(arr[pts-1]);
-      html += '<text x="'+(lx+6).toFixed(1)+'" y="'+(ly+4).toFixed(1)+'" font-size="9" fill="'+col+'" font-family="system-ui" font-weight="700">'+players[pi].split(' ')[0]+'</text>';
+      html += '<text x="'+(lx+6).toFixed(1)+'" y="'+(ly+4).toFixed(1)+'" font-size="9" fill="'+col+'" font-family="system-ui" font-weight="700">'+(playerNames[pi]||players[pi]).split(' ')[0]+'</text>';
     });
 
     // X-axis hole labels
@@ -1384,7 +1387,8 @@ function renderHistory() {
       var i = hist.length - 1 - ri; // real index
       var medals = ['🥇','🥈','🥉'];
       var sorted = game.players.map(function(p,pi) {
-        return { name:p, pi:pi, sum: game.scores[p].reduce(function(a,b){return a+b;},0) };
+        var dn = game.playerNames ? (game.playerNames[pi]||p) : p;
+        return { name:dn, key:p, pi:pi, sum: game.scores[p].reduce(function(a,b){return a+b;},0) };
       }).sort(function(a,b){ return a.sum - b.sum; });
       var parSum = game.pars.reduce(function(a,b){return a+b;},0);
 
@@ -1457,8 +1461,9 @@ function doReset() {
 // ====== EXPORT ======
 function doExportCSV() {
   var rows = ['Spieler,' + Array.from({length:18},function(_,i){return 'Bahn '+(i+1);}).join(',') + ',Gesamt'];
-  players.forEach(function(p) {
-    var row = [p].concat(scores[p]).concat([scores[p].reduce(function(a,b){return a+b;},0)]);
+  players.forEach(function(p, pi) {
+    var dn = playerNames[pi] || p;
+    var row = [dn].concat(scores[p]).concat([scores[p].reduce(function(a,b){return a+b;},0)]);
     rows.push(row.join(','));
   });
   rows.push('Par,' + pars.join(',') + ',' + pars.reduce(function(a,b){return a+b;},0));
@@ -1473,9 +1478,9 @@ function doExportCSV() {
 
 function doExportText() {
   var parSum = pars.reduce(function(a,b){return a+b;},0);
-  var sorted = players.map(function(p) {
+  var sorted = players.map(function(p, pi) {
     var sum = scores[p].reduce(function(a,b){return a+b;},0);
-    return { name:p, sum:sum, diff:sum-parSum };
+    return { name: playerNames[pi]||p, sum:sum, diff:sum-parSum };
   }).sort(function(a,b){ return a.sum-b.sum; });
   var medals = ['🥇','🥈','🥉'];
   var lines = ['⛳ MINIGOLF ERGEBNIS', new Date().toLocaleDateString('de-DE'), ''];
