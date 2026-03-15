@@ -1,4 +1,4 @@
-const CACHE = 'minigolf-v2';
+const CACHE = 'minigolf-v3';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
