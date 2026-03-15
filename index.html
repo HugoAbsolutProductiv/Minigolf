@@ -657,7 +657,7 @@ html { background: #000; }
   pointer-events:none;
 }
 .barchart-holelabel {
-  font-size: 0.58rem; font-weight: 700; color: var(--text3);
+  font-size: 0.65rem; font-weight: 700; color: var(--text2);
   letter-spacing: 0.3px;
 }
 .barchart-group.is-current .barchart-holelabel { color: var(--accent); }
@@ -943,6 +943,9 @@ function startGame() {
     if (name) { players.push(name); scores[name] = new Array(18).fill(0); }
   });
   if (players.length === 0) { showToast('⚠ Mindestens 1 Spieler'); return; }
+  var nameSet = {};
+  var hasDup = players.some(function(n) { if (nameSet[n]) return true; nameSet[n] = true; return false; });
+  if (hasDup) { showToast('⚠ Spielernamen müssen eindeutig sein'); return; }
   currentBahn = 0;
   goToGame();
 }
@@ -1168,8 +1171,8 @@ function renderLeaderboard() {
     if (players.some(function(p){ return scores[p][b] > 0; })) played2++;
   }
   if (players.length > 0 && played2 > 0) {
-    var pts = played2 + 1;
-    var svgW = 340; var svgH = 180;
+    var pts = 19; // always show all 18 holes (0..18)
+    var svgW = 500; var svgH = 180;
     var padL = 28; var padR = 12; var padT = 16; var padB = 24;
 
     // cumulative per player
@@ -1193,7 +1196,8 @@ function renderLeaderboard() {
 
     html += '<div style="margin:0 16px 16px">';
     html += '<div class="lb-holes-title">SPIELVERLAUF (Kumulativ)</div>';
-    html += '<svg viewBox="0 0 '+svgW+' '+svgH+'" style="width:100%;overflow:visible;display:block">';
+    html += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px">';
+    html += '<svg viewBox="0 0 '+svgW+' '+svgH+'" style="min-width:'+svgW+'px;width:100%;overflow:visible;display:block">';
 
     // Y-axis grid lines + labels
     var ySteps = 5;
@@ -1233,7 +1237,7 @@ function renderLeaderboard() {
         html += '<text x="'+toX(xi).toFixed(1)+'" y="'+(svgH-6)+'" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.3)" font-family="system-ui">'+xi+'</text>';
       }
     }
-    html += '</svg></div>';
+    html += '</svg></div></div>';
   }
 
   document.getElementById('lbContent').innerHTML = html;
