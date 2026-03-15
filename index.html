@@ -431,8 +431,8 @@ html { background: #000; }
 .hole-cell.par-eq .hole-cell-score { color: var(--gold); }
 .hole-cell.over .hole-cell-score { color: var(--red); }
 .hole-cell.empty .hole-cell-score { color: var(--text3); }
-.hole-cell.hio-cell { background: rgba(255,55,95,0.12); border-color: rgba(255,55,95,0.35); }
-.hole-cell.hio-cell .hole-cell-score { color: var(--hio); font-size: 0.8rem; }
+.hole-cell.hio-cell { background: rgba(255,214,10,0.12); border-color: rgba(255,214,10,0.45); }
+.hole-cell.hio-cell .hole-cell-score { color: var(--gold); font-size: 0.8rem; }
 .hole-cell.seven-cell { background: rgba(255,69,58,0.1); border-color: rgba(255,69,58,0.3); }
 .hole-cell.seven-cell .hole-cell-score { color: var(--red); font-size: 0.8rem; }
 
@@ -542,22 +542,22 @@ html { background: #000; }
 
 /* === HOLE IN ONE special === */
 @keyframes hioGlow {
-  0%,100% { box-shadow: 0 0 16px rgba(255,55,95,0.6), 0 0 40px rgba(255,55,95,0.2); }
-  50% { box-shadow: 0 0 28px rgba(255,55,95,0.9), 0 0 60px rgba(255,55,95,0.35); }
+  0%,100% { box-shadow: 0 0 18px rgba(255,214,10,0.5), 0 0 48px rgba(255,214,10,0.18); }
+  50% { box-shadow: 0 0 36px rgba(255,214,10,0.85), 0 0 80px rgba(255,214,10,0.32); }
 }
 .score-card.hio {
-  border-color: var(--hio) !important;
-  background: rgba(255,55,95,0.06) !important;
+  border-color: var(--gold) !important;
+  background: rgba(255,214,10,0.06) !important;
   animation: hioGlow 1.8s ease-in-out infinite;
 }
 .hio-badge {
   display: inline-flex; align-items:center; gap: 4px;
-  background: var(--hio); color: white;
+  background: var(--gold); color: #000;
   border-radius: 6px; padding: 2px 8px;
   font-size: 0.62rem; font-weight: 800; letter-spacing: 1.5px;
   text-transform: uppercase; margin-left: 6px;
   vertical-align: middle;
-  animation: hioGlow 1.8s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(255,214,10,0.5);
 }
 
 /* === 7 punkte special (schlecht!) === */
@@ -648,8 +648,8 @@ html { background: #000; }
   position: relative;
 }
 .barchart-bar.hio-bar {
-  background: var(--hio) !important;
-  box-shadow: 0 -4px 12px rgba(255,55,95,0.7) !important;
+  background: var(--gold) !important;
+  box-shadow: 0 -4px 12px rgba(255,214,10,0.6) !important;
 }
 .barchart-bar.seven-bar {
   background: var(--red) !important;
@@ -660,7 +660,7 @@ html { background: #000; }
   margin-bottom: 2px; line-height:1;
   font-variant-numeric: tabular-nums;
 }
-.barchart-val.hio-val { color: var(--hio); }
+.barchart-val.hio-val { color: var(--gold); }
 .barchart-val.seven-val { color: var(--red); }
 /* par line across group */
 .barchart-par-line {
@@ -1058,7 +1058,7 @@ function render() {
       '</div>'+
       '<div class="score-controls">'+
         '<button class="score-btn score-btn-minus" data-p="'+p+'">−</button>'+
-        '<div class="score-num" style="color:'+(isHio?'var(--hio)':(isSeven?'var(--red)':scoreColor))+'">'+s+'</div>'+
+        '<div class="score-num" style="color:'+(isHio?'var(--gold)':(isSeven?'var(--red)':scoreColor))+'">'+s+'</div>'+
         '<button class="score-btn score-btn-plus" data-p="'+p+'"'+(s>=7?' disabled':'')+'>+</button>'+
       '</div>';
 
@@ -1154,7 +1154,7 @@ function renderLeaderboard() {
     var diff = s.sum - parSum;
     var diffStr = diff > 0 ? '+' + diff : (diff === 0 ? '±0' : '' + diff);
     var diffColor = diff > 0 ? 'var(--red)' : (diff < 0 ? 'var(--accent2)' : 'var(--gold)');
-    var hioLabel = s.hios > 0 ? '<span style="font-size:0.65rem;color:var(--hio);margin-left:6px">⛳×'+s.hios+'</span>' : '';
+    var hioLabel = s.hios > 0 ? '<span style="font-size:0.65rem;color:var(--gold);margin-left:6px">⛳×'+s.hios+'</span>' : '';
     var tiedLabel = isTied ? '<span style="font-size:0.6rem;color:var(--text3);margin-left:4px">Gleichstand</span>' : '';
     html += '<div class="lb-row">'+
       '<div class="lb-rank">'+(medals[rank]||'#'+(rank+1))+'</div>'+
@@ -1335,7 +1335,7 @@ function renderOverview() {
         var barH = s > 0 ? Math.max(4, Math.round((s/maxScore)*chartH)) : 3;
         var barColor, barShadow, barCls;
         if (s === 0) { barColor='rgba(255,255,255,0.06)'; barShadow='none'; barCls='barchart-bar'; }
-        else if (isHio) { barColor='var(--hio)'; barShadow='0 -4px 12px rgba(255,55,95,0.7)'; barCls='barchart-bar hio-bar'; }
+        else if (isHio) { barColor='var(--gold)'; barShadow='0 -4px 12px rgba(255,214,10,0.6)'; barCls='barchart-bar hio-bar'; }
         else if (isSeven) { barColor='var(--red)'; barShadow='0 -4px 12px rgba(255,69,58,0.65)'; barCls='barchart-bar seven-bar'; }
         else if (s < par) { barColor=col; barShadow='0 -2px 8px '+col+'55'; barCls='barchart-bar'; }
         else if (s === par) { barColor=col; barShadow='none'; barCls='barchart-bar'; }
